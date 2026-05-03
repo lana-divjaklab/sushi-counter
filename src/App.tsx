@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import {
   Plus,
@@ -45,6 +45,9 @@ export default function App() {
   const [caloriesPerPiece, setCaloriesPerPiece] = useState("42");
   const [view, setView] = useState<View>("table");
   const [busy, setBusy] = useState<null | "create" | "join" | "plus" | "minus">(null);
+  const [joinPrompt, setJoinPrompt] = useState<string | null>(null); // code from QR, null = no prompt
+  const [qrName, setQrName] = useState("");
+  const joinedRef = useRef(false); // prevent double-join
 
   const createTable = useMutation(api.tables.createTable);
   const joinTable = useMutation(api.tables.joinTable);
@@ -61,25 +64,62 @@ export default function App() {
     return tableState.leaderboard.find((player) => player.isCurrentUser)?.rank ?? null;
   }, [tableState]);
 
-  // ── auto-join from URL param ?join=CODE ──
+  // ── QR code join flow ──
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const codeFromUrl = params.get("join");
-    if (codeFromUrl && !activeCode) {
-      setJoinCode(codeFromUrl.toUpperCase());
-      // if we already have a display name, auto-join
-      const stored = getStoredDisplayName();
-      if (stored) {
-        setDisplayName(stored);
-        // small delay so the component is ready
-        const timer = setTimeout(() => {
-          const btn = document.getElementById("auto-join-trigger");
-          btn?.click();
-        }, 300);
-        return () => clearTimeout(timer);
-      }
+    if (!codeFromUrl || activeCode) return;
+
+    const normalized = codeFromUrl.trim().toUpperCase();
+    setJoinCode(normalized);
+
+    const stored = getStoredDisplayName();
+    if (stored && !joinedRef.current) {
+      joinedRef.current = true;
+      setDisplayName(stored);
+      // join directly
+      joinTable({ code: normalized, playerName: stored, clientId })
+        .then(() => {
+          setStoredDisplayName(stored.trim());
+          setActiveTableCode(normalized);
+          setActiveCode(normalized);
+          window.history.replaceState({}, "", window.location.pathname);
+          toast.success(`Joined table ${normalized}`);
+        })
+        .catch((error) => {
+          joinedRef.current = false;
+          toast.error(error instanceof Error ? error.message : "Could not join table");
+        });
+    } else if (!stored) {
+      // show name prompt
+      setJoinPrompt(normalized);
+      setQrName("");
     }
   }, []); // only on mount
+
+  const handleQrJoin = useCallback(async () => {
+    if (!joinPrompt || !qrName.trim()) {
+      toast.error("Enter your name");
+      return;
+    }
+    setBusy("join");
+    try {
+      const normalized = joinPrompt;
+      await joinTable({ code: normalized, playerName: qrName.trim(), clientId });
+      setStoredDisplayName(qrName.trim());
+      setDisplayName(qrName.trim());
+      setActiveTableCode(normalized);
+      setActiveCode(normalized);
+      setJoinCode(normalized);
+      setJoinPrompt(null);
+      window.history.replaceState({}, "", window.location.pathname);
+      toast.success(`Joined table ${normalized}`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not join table");
+    } finally {
+      setBusy(null);
+    }
+  }, [joinPrompt, qrName, joinTable]);
 
   async function handleCreateTable() {
     if (!displayName.trim()) {
@@ -131,7 +171,6 @@ export default function App() {
       setActiveCode(normalized);
       setJoinCode(normalized);
       toast.success(`Joined table ${normalized}`);
-      // clean URL — remove ?join= param
       window.history.replaceState({}, "", window.location.pathname);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not join table");
@@ -189,14 +228,52 @@ export default function App() {
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(251,146,60,0.22),_transparent_35%),linear-gradient(180deg,#120f0f_0%,#191414_45%,#0b0b0b_100%)] text-stone-100">
       <Toaster theme="dark" richColors />
 
-      {/* hidden button to trigger auto-join from URL */}
-      {joinCode && !activeCode && (
-        <button
-          id="auto-join-trigger"
-          className="hidden"
-          onClick={handleJoinTable}
-          type="button"
-        />
+      {/* ── QR join name prompt ── */}
+      {joinPrompt && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
+          <Card className="w-full max-w-sm border-amber-500/30 shadow-2xl shadow-amber-950/40">
+            <CardHeader className="text-center">
+              <div className="mx-auto mb-2 flex size-12 items-center justify-center rounded-full bg-amber-500/20 text-2xl">
+                🍣
+              </div>
+              <CardTitle className="text-xl">Join table</CardTitle>
+              <CardDescription className="mt-1">
+                You were invited to table{" "}
+                <span className="font-bold tracking-wider text-amber-300">
+                  {joinPrompt}
+                </span>
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4 pt-2">
+              <Input
+                value={qrName}
+                onChange={(e) => setQrName(e.target.value)}
+                placeholder="Enter your name"
+                maxLength={24}
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleQrJoin();
+                }}
+              />
+              <div className="flex gap-2">
+                <Button
+                  variant="ghost"
+                  className="flex-1"
+                  onClick={() => setJoinPrompt(null)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  className="flex-1"
+                  onClick={handleQrJoin}
+                  disabled={busy === "join"}
+                >
+                  {busy === "join" ? "Joining..." : "Join now ⚡"}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       )}
 
       <div className="mx-auto flex min-h-screen w-full max-w-md flex-col px-4 pb-32 pt-4 sm:max-w-2xl sm:px-6">
@@ -226,7 +303,7 @@ export default function App() {
         </header>
 
         {/* ── landing: create / join ── */}
-        {!activeCode && (
+        {!activeCode && !joinPrompt && (
           <section className="grid gap-4 sm:grid-cols-2">
             <Card>
               <CardHeader>
@@ -355,7 +432,6 @@ export default function App() {
 
             {/* ── the big table view ── */}
             <TableView
-              tableName={tableState.table.name}
               tableCode={tableState.table.code}
               players={tableState.leaderboard.map((p) => ({
                 id: p.id,
