@@ -7,7 +7,6 @@ import {
   Users,
   Sparkles,
   Table,
-  List,
   History,
   ArrowLeft,
   PartyPopper,
@@ -29,7 +28,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./com
 import { Input } from "./components/ui/input";
 import { Badge } from "./components/ui/badge";
 import TableView from "./components/TableView";
-import { Maki, MakiCheer, MakiSad } from "./components/Maki";
+import { Maki, MakiSad } from "./components/Maki";
 
 type View = "counter" | "leaderboard" | "history";
 
