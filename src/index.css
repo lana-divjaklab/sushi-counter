@@ -1,9 +1,26 @@
 @import "tailwindcss";
 
+@theme {
+  --color-coral: #FF6B6B;
+  --color-coral-light: #FF8C69;
+  --color-matcha: #7BC67E;
+  --color-matcha-dark: #5DAF60;
+  --color-tamago: #FFD93D;
+  --color-tamago-dark: #E8C430;
+  --color-charcoal: #2D2D2D;
+  --color-rice: #FFF8F0;
+  --color-rice-dark: #F5EDE0;
+  --color-salmon: #FF8C42;
+
+  --font-fredoka: "Fredoka", sans-serif;
+  --font-poppins: "Poppins", sans-serif;
+  --font-inter: "Inter", sans-serif;
+}
+
 :root {
-  color: #f5f5f4;
-  background: #0b0b0b;
-  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  color: #2D2D2D;
+  background: #FFF8F0;
+  font-family: "Poppins", "Inter", ui-sans-serif, system-ui, sans-serif;
   line-height: 1.5;
   font-weight: 400;
   font-synthesis: none;
@@ -37,4 +54,39 @@ input {
 
 code {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+/* Animations */
+@keyframes bounce-in {
+  0% { transform: scale(0); opacity: 0; }
+  60% { transform: scale(1.15); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-6px); }
+}
+
+@keyframes confetti-fall {
+  0% { transform: translateY(-100vh) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+}
+
+@keyframes pop {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.2); }
+  100% { transform: scale(1); }
+}
+
+.animate-bounce-in {
+  animation: bounce-in 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+.animate-pop {
+  animation: pop 0.3s ease-in-out;
 }

@@ -5,11 +5,14 @@ import {
   Minus,
   Share2,
   Users,
-  UtensilsCrossed,
   Sparkles,
   Table,
   List,
   History,
+  ArrowLeft,
+  PartyPopper,
+  Trophy,
+  Flame,
 } from "lucide-react";
 import { Toaster, toast } from "sonner";
 import { api } from "../convex/_generated/api";
@@ -22,18 +25,13 @@ import {
 } from "./lib/local";
 import { cn, formatDate, formatRelativeTime } from "./lib/utils";
 import { Button } from "./components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "./components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./components/ui/card";
 import { Input } from "./components/ui/input";
 import { Badge } from "./components/ui/badge";
 import TableView from "./components/TableView";
+import { Maki, MakiCheer, MakiSad } from "./components/Maki";
 
-type View = "table" | "leaderboard" | "history";
+type View = "counter" | "leaderboard" | "history";
 
 const clientId = getOrCreateClientId();
 
@@ -43,11 +41,14 @@ export default function App() {
   const [joinCode, setJoinCode] = useState(getActiveTableCode());
   const [activeCode, setActiveCode] = useState(getActiveTableCode());
   const [caloriesPerPiece, setCaloriesPerPiece] = useState("42");
-  const [view, setView] = useState<View>("table");
+  const [view, setView] = useState<View>("counter");
   const [busy, setBusy] = useState<null | "create" | "join" | "plus" | "minus">(null);
-  const [joinPrompt, setJoinPrompt] = useState<string | null>(null); // code from QR, null = no prompt
+  const [joinPrompt, setJoinPrompt] = useState<string | null>(null);
   const [qrName, setQrName] = useState("");
-  const joinedRef = useRef(false); // prevent double-join
+  const [showConfetti, setShowConfetti] = useState(false);
+  const [lastCount, setLastCount] = useState(0);
+  const joinedRef = useRef(false);
+  const plusBtnRef = useRef<HTMLButtonElement>(null);
 
   const createTable = useMutation(api.tables.createTable);
   const joinTable = useMutation(api.tables.joinTable);
@@ -61,10 +62,20 @@ export default function App() {
 
   const currentRank = useMemo(() => {
     if (!tableState?.currentPlayer) return null;
-    return tableState.leaderboard.find((player) => player.isCurrentUser)?.rank ?? null;
+    return tableState.leaderboard.find((p) => p.isCurrentUser)?.rank ?? null;
   }, [tableState]);
 
-  // ── QR code join flow ──
+  // Track count changes for confetti animation
+  const prevPieces = tableState?.currentPlayer?.pieces ?? 0;
+  useEffect(() => {
+    if (prevPieces > lastCount && prevPieces > 0 && (prevPieces % 10 === 0 || prevPieces === 1)) {
+      setShowConfetti(true);
+      setTimeout(() => setShowConfetti(false), 2500);
+    }
+    setLastCount(prevPieces);
+  }, [prevPieces]);
+
+  // QR join flow
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const codeFromUrl = params.get("join");
@@ -77,25 +88,23 @@ export default function App() {
     if (stored && !joinedRef.current) {
       joinedRef.current = true;
       setDisplayName(stored);
-      // join directly
       joinTable({ code: normalized, playerName: stored, clientId })
         .then(() => {
           setStoredDisplayName(stored.trim());
           setActiveTableCode(normalized);
           setActiveCode(normalized);
           window.history.replaceState({}, "", window.location.pathname);
-          toast.success(`Joined table ${normalized}`);
+          toast.success(`Joined table ${normalized} 🍣`);
         })
         .catch((error) => {
           joinedRef.current = false;
           toast.error(error instanceof Error ? error.message : "Could not join table");
         });
     } else if (!stored) {
-      // show name prompt
       setJoinPrompt(normalized);
       setQrName("");
     }
-  }, []); // only on mount
+  }, []);
 
   const handleQrJoin = useCallback(async () => {
     if (!joinPrompt || !qrName.trim()) {
@@ -113,7 +122,7 @@ export default function App() {
       setJoinCode(normalized);
       setJoinPrompt(null);
       window.history.replaceState({}, "", window.location.pathname);
-      toast.success(`Joined table ${normalized}`);
+      toast.success(`Joined table ${normalized} 🍣`);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not join table");
     } finally {
@@ -130,7 +139,6 @@ export default function App() {
       toast.error("Give the table a name");
       return;
     }
-
     setBusy("create");
     try {
       const result = await createTable({
@@ -144,7 +152,7 @@ export default function App() {
       setActiveCode(result.code);
       setJoinCode(result.code);
       setTableName("");
-      toast.success(`Table ${result.code} is ready`);
+      toast.success(`Table ${result.code} is ready! 🎉`);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not create table");
     } finally {
@@ -161,7 +169,6 @@ export default function App() {
       toast.error("Enter a table code");
       return;
     }
-
     setBusy("join");
     try {
       const normalized = joinCode.trim().toUpperCase();
@@ -170,7 +177,7 @@ export default function App() {
       setActiveTableCode(normalized);
       setActiveCode(normalized);
       setJoinCode(normalized);
-      toast.success(`Joined table ${normalized}`);
+      toast.success(`Joined table ${normalized} 🍣`);
       window.history.replaceState({}, "", window.location.pathname);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not join table");
@@ -194,17 +201,13 @@ export default function App() {
   async function shareTable() {
     if (!tableState) return;
     const joinUrl = `${window.location.origin}/?join=${tableState.table.code}`;
-    const shareText = `Join my sushi table "${tableState.table.name}" — scan the QR or use code ${tableState.table.code}`;
+    const shareText = `🍣 Join my sushi table "${tableState.table.name}" — use code ${tableState.table.code}`;
     try {
       if (navigator.share) {
-        await navigator.share({
-          title: "Sushi Counter",
-          text: shareText,
-          url: joinUrl,
-        });
+        await navigator.share({ title: "Sushi Counter", text: shareText, url: joinUrl });
       } else {
         await navigator.clipboard.writeText(`${shareText}\n${joinUrl}`);
-        toast.success("Share link copied");
+        toast.success("Share link copied 📋");
       }
     } catch {
       toast.error("Could not share right now");
@@ -215,33 +218,63 @@ export default function App() {
     setActiveCode("");
     setActiveTableCode("");
     setJoinCode("");
-    setView("table");
+    setView("counter");
     window.history.replaceState({}, "", window.location.pathname);
   }
 
-  const joinUrl = tableState
-    ? `${window.location.origin}/?join=${tableState.table.code}`
-    : "";
+  const joinUrl = tableState ? `${window.location.origin}/?join=${tableState.table.code}` : "";
 
-  // ── render ──
+  // Determine Maki expression based on current count
+  const makiExpr = useMemo(() => {
+    const pieces = tableState?.currentPlayer?.pieces ?? 0;
+    if (pieces === 0) return "sad" as const;
+    if (pieces >= 50) return "surprised" as const;
+    if (pieces >= 20) return "happy" as const;
+    return "competitive" as const;
+  }, [tableState?.currentPlayer?.pieces]);
+
+  const makiBadge = tableState?.currentPlayer?.pieces ?? undefined;
+
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(251,146,60,0.22),_transparent_35%),linear-gradient(180deg,#120f0f_0%,#191414_45%,#0b0b0b_100%)] text-stone-100">
-      <Toaster theme="dark" richColors />
+    <div className="min-h-screen bg-gradient-to-b from-rice to-rice-dark">
+      <Toaster
+        position="top-center"
+        toastOptions={{
+          className: "!rounded-2xl !border !border-stone-200 !shadow-lg !font-poppins",
+          duration: 2500,
+        }}
+      />
+
+      {/* ── Confetti overlay ── */}
+      {showConfetti && (
+        <div className="fixed inset-0 z-50 pointer-events-none overflow-hidden">
+          {Array.from({ length: 20 }).map((_, i) => (
+            <div
+              key={i}
+              className="absolute text-2xl"
+              style={{
+                left: `${Math.random() * 100}%`,
+                animation: `confetti-fall ${2 + Math.random() * 2}s linear forwards`,
+                animationDelay: `${Math.random() * 0.5}s`,
+              }}
+            >
+              {["🍣", "🎉", "✨", "🏆", "🎊", "🌟", "🔥"][i % 7]}
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* ── QR join name prompt ── */}
       {joinPrompt && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
-          <Card className="w-full max-w-sm border-amber-500/30 shadow-2xl shadow-amber-950/40">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm px-4">
+          <Card className="w-full max-w-sm shadow-xl">
             <CardHeader className="text-center">
-              <div className="mx-auto mb-2 flex size-12 items-center justify-center rounded-full bg-amber-500/20 text-2xl">
-                🍣
+              <div className="mx-auto mb-2">
+                <Maki expression="happy" size="lg" showBadge={false} />
               </div>
-              <CardTitle className="text-xl">Join table</CardTitle>
+              <CardTitle className="text-xl">You're invited! 🍣</CardTitle>
               <CardDescription className="mt-1">
-                You were invited to table{" "}
-                <span className="font-bold tracking-wider text-amber-300">
-                  {joinPrompt}
-                </span>
+                Join table <span className="font-bold tracking-wider text-coral">{joinPrompt}</span>
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4 pt-2">
@@ -256,18 +289,10 @@ export default function App() {
                 }}
               />
               <div className="flex gap-2">
-                <Button
-                  variant="ghost"
-                  className="flex-1"
-                  onClick={() => setJoinPrompt(null)}
-                >
+                <Button variant="ghost" className="flex-1" onClick={() => setJoinPrompt(null)}>
                   Cancel
                 </Button>
-                <Button
-                  className="flex-1"
-                  onClick={handleQrJoin}
-                  disabled={busy === "join"}
-                >
+                <Button className="flex-1" onClick={handleQrJoin} disabled={busy === "join"}>
                   {busy === "join" ? "Joining..." : "Join now ⚡"}
                 </Button>
               </div>
@@ -276,219 +301,150 @@ export default function App() {
         </div>
       )}
 
-      <div className="mx-auto flex min-h-screen w-full max-w-md flex-col px-4 pb-32 pt-4 sm:max-w-2xl sm:px-6">
-        {/* ── header ── */}
-        <header className="mb-5 flex items-center justify-between gap-3">
-          <div>
-            <div className="mb-2 flex items-center gap-2 text-orange-300">
-              <UtensilsCrossed className="size-4" />
-              <span className="text-sm font-medium">Sushi Counter</span>
+      <div className="mx-auto flex min-h-screen w-full max-w-md flex-col px-4 pb-36 pt-4 sm:max-w-2xl sm:px-6">
+        {/* ── Header ── */}
+        <header className="mb-6 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <Maki expression="happy" size="md" showBadge={false} animated={true} />
+            <div>
+              <h1 className="text-2xl font-fredoka font-bold text-charcoal leading-tight">
+                Sushi Counter
+              </h1>
+              <p className="text-xs text-stone-500 font-medium">
+                Track. Compete. Dominate.
+              </p>
             </div>
-            <h1 className="text-3xl font-semibold tracking-tight text-white">
-              Eat. Tap. Flex.
-            </h1>
-            <p className="mt-1 text-sm text-stone-400">
-              Live table leaderboard for sushi nights.
-            </p>
           </div>
-          <div className="rounded-3xl border border-white/10 bg-white/5 px-4 py-3 text-right backdrop-blur">
-            <div className="text-[11px] uppercase tracking-[0.22em] text-stone-500">
+          <div className="rounded-2xl bg-white border border-stone-200 px-4 py-2.5 text-right shadow-sm">
+            <div className="text-[10px] uppercase tracking-wider text-stone-400 font-medium">
               Lifetime
             </div>
-            <div className="text-xl font-semibold text-white">
+            <div className="text-xl font-fredoka font-bold text-coral">
               {personalStats?.totalPieces ?? 0}
             </div>
             <div className="text-xs text-stone-400">pieces</div>
           </div>
         </header>
 
-<<<<<<< Updated upstream
-        {/* ── landing: create / join ── */}
-        {!activeCode && !joinPrompt && (
-          <section className="grid gap-4 sm:grid-cols-2">
-            <Card>
-=======
+        {/* ── Landing: Create / Join ── */}
         {!activeCode && (
-          <section className="grid gap-4 sm:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle>Create a table</CardTitle>
-                <CardDescription>Start the sushi war and share the code.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <Input value={displayName} onChange={(event) => setDisplayName(event.target.value)} placeholder="Your name" maxLength={24} />
-                <Input value={tableName} onChange={(event) => setTableName(event.target.value)} placeholder="Table name (e.g. Sushi Date Night)" maxLength={40} />
-                <Input
-                  value={caloriesPerPiece}
-                  onChange={(event) => setCaloriesPerPiece(event.target.value.replace(/[^0-9]/g, ""))}
-                  inputMode="numeric"
-                  placeholder="Calories per piece"
-                />
-                <Button className="w-full" onClick={handleCreateTable} disabled={busy === "create"}>
-                  <Sparkles className="size-4" />
-                  {busy === "create" ? "Creating..." : "Create table"}
-                </Button>
-              </CardContent>
-            </Card>
+          <>
+            <div className="text-center mb-6">
+              <Maki expression="competitive" size="xl" showBadge={false} animated={true} />
+              <h2 className="mt-3 text-lg font-fredoka font-semibold text-charcoal">
+                Ready for sushi night?
+              </h2>
+              <p className="text-sm text-stone-500 mt-1">
+                Create a table or join one with a code
+              </p>
+            </div>
+            <section className="grid gap-4 sm:grid-cols-2">
+              <Card>
+                <CardHeader>
+                  <CardTitle>🍣 Create a table</CardTitle>
+                  <CardDescription>Start the sushi war and share the code.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <Input
+                    value={displayName}
+                    onChange={(e) => setDisplayName(e.target.value)}
+                    placeholder="Your name"
+                    maxLength={24}
+                  />
+                  <Input
+                    value={tableName}
+                    onChange={(e) => setTableName(e.target.value)}
+                    placeholder="Table name (e.g. Sushi Date Night)"
+                    maxLength={40}
+                  />
+                  <Input
+                    value={caloriesPerPiece}
+                    onChange={(e) => setCaloriesPerPiece(e.target.value.replace(/[^0-9]/g, ""))}
+                    inputMode="numeric"
+                    placeholder="Calories per piece (default 42)"
+                  />
+                  <Button className="w-full" onClick={handleCreateTable} disabled={busy === "create"}>
+                    <Sparkles className="size-4" />
+                    {busy === "create" ? "Creating..." : "Create table"}
+                  </Button>
+                </CardContent>
+              </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Join a table</CardTitle>
-                <CardDescription>Jump in with a short code from your crew.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <Input value={displayName} onChange={(event) => setDisplayName(event.target.value)} placeholder="Your name" maxLength={24} />
-                <Input
-                  value={joinCode}
-                  onChange={(event) => setJoinCode(event.target.value.toUpperCase())}
-                  placeholder="Table code"
-                  maxLength={6}
-                  className="uppercase tracking-[0.35em]"
-                />
-                <Button variant="secondary" className="w-full" onClick={handleJoinTable} disabled={busy === "join"}>
-                  <Users className="size-4" />
-                  {busy === "join" ? "Joining..." : "Join table"}
-                </Button>
-              </CardContent>
-            </Card>
-          </section>
+              <Card>
+                <CardHeader>
+                  <CardTitle>🔗 Join a table</CardTitle>
+                  <CardDescription>Jump in with a short code from your crew.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <Input
+                    value={displayName}
+                    onChange={(e) => setDisplayName(e.target.value)}
+                    placeholder="Your name"
+                    maxLength={24}
+                  />
+                  <Input
+                    value={joinCode}
+                    onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+                    placeholder="Table code"
+                    maxLength={6}
+                    className="uppercase tracking-[0.35em] font-mono"
+                  />
+                  <Button
+                    variant="secondary"
+                    className="w-full"
+                    onClick={handleJoinTable}
+                    disabled={busy === "join"}
+                  >
+                    <Users className="size-4" />
+                    {busy === "join" ? "Joining..." : "Join table"}
+                  </Button>
+                </CardContent>
+              </Card>
+            </section>
+          </>
         )}
 
+        {/* ── Loading ── */}
         {activeCode && !tableState && (
-          <Card className="mt-4">
-            <CardContent className="pt-5 text-sm text-stone-400">Loading table <span className="font-medium text-white">{activeCode}</span>...</CardContent>
-          </Card>
+          <div className="flex flex-col items-center justify-center py-16 gap-4">
+            <Maki expression="sleepy" size="xl" showBadge={false} animated={false} />
+            <p className="text-sm text-stone-400 font-poppins">
+              Loading table <span className="font-bold text-coral">{activeCode}</span>...
+            </p>
+          </div>
         )}
 
+        {/* ── Inside a table ── */}
         {tableState && (
           <>
-            <Card className="mt-4 overflow-hidden border-orange-400/15 bg-gradient-to-br from-orange-500/10 via-white/5 to-transparent">
->>>>>>> Stashed changes
-              <CardHeader>
-                <CardTitle>Create a table</CardTitle>
-                <CardDescription>
-                  Start the sushi war and share the code.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <Input
-                  value={displayName}
-                  onChange={(e) => setDisplayName(e.target.value)}
-                  placeholder="Your name"
-                  maxLength={24}
-                />
-                <Input
-                  value={tableName}
-                  onChange={(e) => setTableName(e.target.value)}
-                  placeholder="Table name (e.g. Sushi Date Night)"
-                  maxLength={40}
-                />
-                <Input
-                  value={caloriesPerPiece}
-                  onChange={(e) =>
-                    setCaloriesPerPiece(
-                      e.target.value.replace(/[^0-9]/g, ""),
-                    )
-                  }
-                  inputMode="numeric"
-                  placeholder="Calories per piece"
-                />
-                <Button
-                  className="w-full"
-                  onClick={handleCreateTable}
-                  disabled={busy === "create"}
-                >
-                  <Sparkles className="size-4" />
-                  {busy === "create" ? "Creating..." : "Create table"}
-                </Button>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Join a table</CardTitle>
-                <CardDescription>
-                  Jump in with a short code from your crew.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <Input
-                  value={displayName}
-                  onChange={(e) => setDisplayName(e.target.value)}
-                  placeholder="Your name"
-                  maxLength={24}
-                />
-                <Input
-                  value={joinCode}
-                  onChange={(e) =>
-                    setJoinCode(e.target.value.toUpperCase())
-                  }
-                  placeholder="Table code"
-                  maxLength={6}
-                  className="uppercase tracking-[0.35em]"
-                />
-                <Button
-                  variant="secondary"
-                  className="w-full"
-                  onClick={handleJoinTable}
-                  disabled={busy === "join"}
-                >
-                  <Users className="size-4" />
-                  {busy === "join" ? "Joining..." : "Join table"}
-                </Button>
-              </CardContent>
-            </Card>
-          </section>
-        )}
-
-        {/* ── loading ── */}
-        {activeCode && !tableState && (
-          <Card className="mt-4">
-            <CardContent className="pt-5 text-sm text-stone-400">
-              Loading table{" "}
-              <span className="font-medium text-white">{activeCode}</span>...
-            </CardContent>
-          </Card>
-        )}
-
-        {/* ── inside a table ── */}
-        {tableState && (
-          <>
-            {/* mini header bar */}
-            <div className="mb-3 flex items-center justify-between gap-2">
+            {/* Mini header bar */}
+            <div className="mb-4 flex items-center justify-between gap-2">
               <div className="flex items-center gap-2">
-                <Badge className="border-amber-600/20 bg-amber-600/15 text-amber-200">
-                  Table
-                </Badge>
-                <span className="text-lg font-semibold tracking-tight text-white">
+                <button
+                  onClick={leaveTable}
+                  className="flex items-center gap-1 text-xs text-stone-400 hover:text-charcoal transition-colors"
+                >
+                  <ArrowLeft className="size-3.5" />
+                  Exit
+                </button>
+                <span className="text-stone-300 mx-1">|</span>
+                <Badge variant="matcha">
+                  <Table className="size-3 mr-1" />
                   {tableState.table.name}
-                </span>
-                <span className="text-sm font-mono tracking-widest text-stone-500">
+                </Badge>
+                <span className="text-sm font-mono tracking-widest text-stone-400">
                   {tableState.table.code}
                 </span>
               </div>
               <div className="flex items-center gap-1">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-8 px-2 text-xs"
-                  onClick={shareTable}
-                >
+                <Button variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={shareTable}>
                   <Share2 className="size-3" />
                   Share
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-8 px-2 text-xs text-stone-400"
-                  onClick={leaveTable}
-                >
-                  Leave
                 </Button>
               </div>
             </div>
 
-            {/* ── the big table view ── */}
+            {/* ── Table View (QR table) ── */}
             <TableView
               tableCode={tableState.table.code}
               players={tableState.leaderboard.map((p) => ({
@@ -501,12 +457,12 @@ export default function App() {
               joinUrl={joinUrl}
             />
 
-            {/* ── tab bar ── */}
+            {/* ── View tabs ── */}
             <div className="mt-4 mb-3 flex gap-1.5">
               {(
                 [
-                  ["table", "Table", Table],
-                  ["leaderboard", "Leaderboard", List],
+                  ["counter", "Counter", Plus],
+                  ["leaderboard", "Leaderboard", Trophy],
                   ["history", "History", History],
                 ] as const
               ).map(([key, label, Icon]) => (
@@ -517,8 +473,8 @@ export default function App() {
                   className={cn(
                     "flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-medium transition-all",
                     view === key
-                      ? "bg-orange-500 text-white shadow-lg shadow-orange-500/20"
-                      : "bg-white/8 text-stone-400 hover:bg-white/12 hover:text-stone-200",
+                      ? "bg-coral text-white shadow-md shadow-coral/30"
+                      : "bg-white text-stone-500 border border-stone-200 hover:border-coral/30 hover:text-charcoal",
                   )}
                 >
                   <Icon className="size-3.5" />
@@ -527,44 +483,118 @@ export default function App() {
               ))}
             </div>
 
-            {/* ── leaderboard panel ── */}
+            {/* ── Counter Screen ── */}
+            {view === "counter" && tableState.currentPlayer && (
+              <Card className="overflow-visible">
+                <CardContent className="pt-6">
+                  {/* Maki & big count */}
+                  <div className="flex flex-col items-center gap-3 text-center">
+                    <Maki expression={makiExpr} size="xl" showBadge={makiBadge} animated />
+                    <div className="-mt-1">
+                      <div className="text-sm text-stone-500 font-medium">Your sushi count</div>
+                      <div
+                        className="font-fredoka font-bold text-charcoal leading-none mt-1 select-none"
+                        style={{ fontSize: "clamp(3rem, 15vw, 5rem)" }}
+                      >
+                        {tableState.currentPlayer.pieces}
+                      </div>
+                      <div className="text-sm text-stone-500 mt-1">
+                        ≈ {tableState.currentPlayer.calories} kcal
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Quick stats row */}
+                  <div className="mt-5 grid grid-cols-3 gap-2">
+                    <div className="rounded-2xl bg-gradient-to-br from-coral/10 to-white border border-coral/20 p-3 text-center">
+                      <Trophy className="size-4 mx-auto text-tamago-dark mb-1" />
+                      <div className="text-lg font-fredoka font-bold text-charcoal">
+                        {currentRank ? `#${currentRank}` : "—"}
+                      </div>
+                      <div className="text-[10px] text-stone-500 uppercase tracking-wider">Rank</div>
+                    </div>
+                    <div className="rounded-2xl bg-gradient-to-br from-matcha/10 to-white border border-matcha/20 p-3 text-center">
+                      <Users className="size-4 mx-auto text-matcha-dark mb-1" />
+                      <div className="text-lg font-fredoka font-bold text-charcoal">
+                        {tableState.summary.totalPlayers}
+                      </div>
+                      <div className="text-[10px] text-stone-500 uppercase tracking-wider">Players</div>
+                    </div>
+                    <div className="rounded-2xl bg-gradient-to-br from-tamago/10 to-white border border-tamago/20 p-3 text-center">
+                      <Flame className="size-4 mx-auto text-salmon mb-1" />
+                      <div className="text-lg font-fredoka font-bold text-charcoal">
+                        {tableState.summary.totalPieces}
+                      </div>
+                      <div className="text-[10px] text-stone-500 uppercase tracking-wider">Total</div>
+                    </div>
+                  </div>
+
+                  {/* Milestone celebration */}
+                  {prevPieces > 0 && prevPieces % 10 === 0 && (
+                    <div className="mt-3 text-center animate-bounce-in">
+                      <Badge variant="tamago" className="text-xs">
+                        <PartyPopper className="size-3 mr-1" />
+                        {prevPieces} pieces! You're on fire! 🔥
+                      </Badge>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* ── Leaderboard Screen ── */}
             {view === "leaderboard" && (
-              <Card className="mt-1">
+              <Card>
                 <CardHeader>
-                  <CardTitle>Leaderboard</CardTitle>
-                  <CardDescription>
-                    Who's actually doing damage.
-                  </CardDescription>
+                  <CardTitle>
+                    <Trophy className="size-4 inline mr-1.5 text-tamago-dark" />
+                    Leaderboard
+                  </CardTitle>
+                  <CardDescription>Who's actually doing damage.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-2">
                   {tableState.leaderboard.map((player) => (
                     <div
                       key={player.id}
                       className={cn(
-                        "flex items-center justify-between rounded-2xl border px-4 py-3",
+                        "flex items-center justify-between rounded-2xl border px-4 py-3 transition-all",
                         player.isCurrentUser
-                          ? "border-orange-400/30 bg-orange-400/10"
-                          : "border-white/10 bg-black/15",
+                          ? "border-coral/30 bg-gradient-to-r from-coral/5 to-white"
+                          : "border-stone-100 bg-white",
                       )}
                     >
                       <div className="flex items-center gap-3">
-                        <div className="flex size-10 items-center justify-center rounded-2xl bg-white/10 text-sm font-semibold text-white">
+                        <div
+                          className={cn(
+                            "flex size-10 items-center justify-center rounded-2xl font-fredoka font-bold",
+                            player.rank === 1
+                              ? "bg-gradient-to-br from-tamago to-amber-400 text-white shadow-sm"
+                              : player.rank === 2
+                              ? "bg-gradient-to-br from-stone-300 to-stone-400 text-white"
+                              : player.rank === 3
+                              ? "bg-gradient-to-br from-amber-600 to-amber-700 text-white"
+                              : "bg-stone-100 text-stone-600",
+                          )}
+                        >
                           #{player.rank}
                         </div>
                         <div>
-                          <div className="font-medium text-white">
+                          <div className="font-medium text-charcoal">
                             {player.name}
+                            {player.isCurrentUser && (
+                              <span className="ml-1.5 text-[10px] text-coral font-medium">(you)</span>
+                            )}
                           </div>
-                          <div className="text-xs text-stone-400">
-                            {player.calories} kcal
-                          </div>
+                          <div className="text-xs text-stone-400">{player.calories} kcal</div>
                         </div>
                       </div>
                       <div className="text-right">
-                        <div className="text-xl font-semibold text-white">
+                        <div className="text-xl font-fredoka font-bold text-charcoal">
                           {player.pieces}
                         </div>
-                        <div className="text-xs text-stone-400">pieces</div>
+                        <div className="text-xs text-stone-400">
+                          <span className="inline-block mr-0.5">🍣</span> pieces
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -572,50 +602,40 @@ export default function App() {
               </Card>
             )}
 
-            {/* ── history panel ── */}
+            {/* ── History Screen ── */}
             {view === "history" && (
-              <div className="mt-1 grid gap-4 sm:grid-cols-[1fr_1fr]">
+              <div className="grid gap-4 sm:grid-cols-[1fr_1fr]">
                 <Card>
                   <CardHeader>
-                    <CardTitle>Recent table action</CardTitle>
-                    <CardDescription>
-                      Little live event feed.
-                    </CardDescription>
+                    <CardTitle>Recent action</CardTitle>
+                    <CardDescription>Live event feed.</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-3">
                     {tableState.recentEvents.length === 0 ? (
-                      <div className="text-sm text-stone-400">
-                        No sushi logged yet.
+                      <div className="flex flex-col items-center py-6">
+                        <MakiSad />
                       </div>
                     ) : (
                       tableState.recentEvents.map((event) => (
                         <div
                           key={event.id}
-                          className="flex items-center justify-between rounded-2xl border border-white/10 bg-black/15 px-4 py-3 text-sm"
+                          className="flex items-center justify-between rounded-2xl border border-stone-100 bg-white px-4 py-3 text-sm"
                         >
                           <div>
-                            <div className="font-medium text-white">
-                              {event.playerName}
-                            </div>
-                            <div className="text-stone-400">
-                              {formatRelativeTime(event.createdAt)}
-                            </div>
+                            <div className="font-medium text-charcoal">{event.playerName}</div>
+                            <div className="text-stone-400 text-xs">{formatRelativeTime(event.createdAt)}</div>
                           </div>
                           <div className="text-right">
                             <div
                               className={cn(
-                                "font-semibold",
-                                event.delta > 0
-                                  ? "text-emerald-300"
-                                  : "text-rose-300",
+                                "font-fredoka font-bold",
+                                event.delta > 0 ? "text-matcha-dark" : "text-rose-400",
                               )}
                             >
-                              {event.delta > 0
-                                ? `+${event.delta}`
-                                : event.delta}
+                              {event.delta > 0 ? `+${event.delta}` : event.delta}
                             </div>
-                            <div className="text-stone-400">
-                              now {event.resultingPieces}
+                            <div className="text-stone-400 text-xs">
+                              {event.resultingPieces} total
                             </div>
                           </div>
                         </div>
@@ -627,135 +647,66 @@ export default function App() {
                 <Card>
                   <CardHeader>
                     <CardTitle>Your past sessions</CardTitle>
-                    <CardDescription>
-                      Stored for this browser profile.
-                    </CardDescription>
+                    <CardDescription>Stored for this browser.</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-3">
                     {personalStats?.sessions.length ? (
-                      personalStats.sessions
-                        .slice(0, 8)
-                        .map((session) => (
-                          <div
-                            key={session.id}
-                            className="rounded-2xl border border-white/10 bg-black/15 px-4 py-3 text-sm"
-                          >
-                            <div className="flex items-center justify-between gap-3">
-                              <div className="font-medium text-white">
-                                {session.tableName}
-                              </div>
-                              <Badge className="border-white/10 bg-white/10 text-stone-200">
-                                {session.tableCode}
-                              </Badge>
-                            </div>
-                            <div className="mt-2 flex items-center justify-between text-stone-400">
-                              <span>
-                                {formatDate(session.updatedAt)}
-                              </span>
-                              <span>{session.pieces} pieces</span>
-                            </div>
+                      personalStats.sessions.slice(0, 8).map((session) => (
+                        <div
+                          key={session.id}
+                          className="rounded-2xl border border-stone-100 bg-white px-4 py-3 text-sm"
+                        >
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="font-medium text-charcoal">{session.tableName}</div>
+                            <Badge variant="charcoal" className="text-[10px]">
+                              {session.tableCode}
+                            </Badge>
                           </div>
-                        ))
+                          <div className="mt-2 flex items-center justify-between text-stone-400 text-xs">
+                            <span>{formatDate(session.updatedAt)}</span>
+                            <span className="font-fredoka text-charcoal">{session.pieces} 🍣</span>
+                          </div>
+                        </div>
+                      ))
                     ) : (
-                      <div className="text-sm text-stone-400">
-                        No past sessions yet.
+                      <div className="flex flex-col items-center py-6">
+                        <MakiSad />
+                        <p className="text-sm text-stone-400">No past sessions yet.</p>
                       </div>
                     )}
                   </CardContent>
                 </Card>
               </div>
             )}
-
-            {/* ── table panel (counter card) ── */}
-            {view === "table" && tableState.currentPlayer && (
-              <Card className="mt-1 overflow-hidden">
-                <CardHeader>
-                  <CardTitle>{tableState.currentPlayer.name}</CardTitle>
-                  <CardDescription>
-                    Your live sushi count for this table.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    {/* big piece counter */}
-                    <div className="rounded-[28px] border border-white/10 bg-black/25 p-5 text-center">
-                      <div className="text-sm text-stone-400">
-                        Current pieces
-                      </div>
-                      <div className="mt-2 text-6xl font-semibold leading-none text-white">
-                        {tableState.currentPlayer.pieces}
-                      </div>
-                      <div className="mt-3 text-sm text-orange-200">
-                        ≈ {tableState.currentPlayer.calories} kcal
-                      </div>
-                    </div>
-
-                    {/* quick stats */}
-                    <div className="flex flex-col justify-center gap-2 text-sm text-stone-300">
-                      <InfoRow
-                        label="Your rank"
-                        value={currentRank ? `#${currentRank}` : "—"}
-                      />
-                      <InfoRow
-                        label="Pieces / sushi"
-                        value={`${tableState.table.caloriesPerPiece} kcal`}
-                      />
-                      <InfoRow
-                        label="Players"
-                        value={tableState.summary.totalPlayers}
-                      />
-                      <InfoRow
-                        label="Table total"
-                        value={tableState.summary.totalPieces}
-                      />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
           </>
         )}
       </div>
 
-      {/* ── fixed bottom bar (add / remove sushi) ── */}
+      {/* ── Fixed bottom bar (+ / - sushi) ── */}
       {tableState?.currentPlayer && (
-        <div className="fixed inset-x-0 bottom-0 z-20 border-t border-white/10 bg-black/70 px-4 py-4 backdrop-blur-xl">
+        <div className="fixed inset-x-0 bottom-0 z-20 border-t border-stone-200 bg-white/90 px-4 py-4 backdrop-blur-xl shadow-[0_-4px_20px_rgba(0,0,0,0.06)]">
           <div className="mx-auto flex w-full max-w-md items-center gap-3 sm:max-w-2xl">
             <Button
               size="icon"
               variant="destructive"
               onClick={() => handleChange(-1)}
-              disabled={busy === "minus"}
+              disabled={busy === "minus" || (tableState.currentPlayer?.pieces ?? 0) === 0}
             >
               <Minus className="size-5" />
             </Button>
             <Button
+              ref={plusBtnRef}
               size="lg"
-              className="h-14 flex-1 text-lg"
+              className="h-14 flex-1 text-lg font-fredoka font-semibold"
               onClick={() => handleChange(1)}
               disabled={busy === "plus"}
             >
               <Plus className="size-5" />
-              Add sushi
+              Eat sushi 🍣
             </Button>
           </div>
         </div>
       )}
-    </div>
-  );
-}
-
-function InfoRow({
-  label,
-  value,
-}: {
-  label: string;
-  value: string | number;
-}) {
-  return (
-    <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-black/15 px-4 py-3">
-      <span className="text-stone-400">{label}</span>
-      <span className="font-medium text-white">{value}</span>
     </div>
   );
 }
