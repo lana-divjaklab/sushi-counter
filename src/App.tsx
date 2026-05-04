@@ -302,10 +302,68 @@ export default function App() {
           </div>
         </header>
 
+<<<<<<< Updated upstream
         {/* ── landing: create / join ── */}
         {!activeCode && !joinPrompt && (
           <section className="grid gap-4 sm:grid-cols-2">
             <Card>
+=======
+        {!activeCode && (
+          <section className="grid gap-4 sm:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <CardTitle>Create a table</CardTitle>
+                <CardDescription>Start the sushi war and share the code.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <Input value={displayName} onChange={(event) => setDisplayName(event.target.value)} placeholder="Your name" maxLength={24} />
+                <Input value={tableName} onChange={(event) => setTableName(event.target.value)} placeholder="Table name (e.g. Sushi Date Night)" maxLength={40} />
+                <Input
+                  value={caloriesPerPiece}
+                  onChange={(event) => setCaloriesPerPiece(event.target.value.replace(/[^0-9]/g, ""))}
+                  inputMode="numeric"
+                  placeholder="Calories per piece"
+                />
+                <Button className="w-full" onClick={handleCreateTable} disabled={busy === "create"}>
+                  <Sparkles className="size-4" />
+                  {busy === "create" ? "Creating..." : "Create table"}
+                </Button>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Join a table</CardTitle>
+                <CardDescription>Jump in with a short code from your crew.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <Input value={displayName} onChange={(event) => setDisplayName(event.target.value)} placeholder="Your name" maxLength={24} />
+                <Input
+                  value={joinCode}
+                  onChange={(event) => setJoinCode(event.target.value.toUpperCase())}
+                  placeholder="Table code"
+                  maxLength={6}
+                  className="uppercase tracking-[0.35em]"
+                />
+                <Button variant="secondary" className="w-full" onClick={handleJoinTable} disabled={busy === "join"}>
+                  <Users className="size-4" />
+                  {busy === "join" ? "Joining..." : "Join table"}
+                </Button>
+              </CardContent>
+            </Card>
+          </section>
+        )}
+
+        {activeCode && !tableState && (
+          <Card className="mt-4">
+            <CardContent className="pt-5 text-sm text-stone-400">Loading table <span className="font-medium text-white">{activeCode}</span>...</CardContent>
+          </Card>
+        )}
+
+        {tableState && (
+          <>
+            <Card className="mt-4 overflow-hidden border-orange-400/15 bg-gradient-to-br from-orange-500/10 via-white/5 to-transparent">
+>>>>>>> Stashed changes
               <CardHeader>
                 <CardTitle>Create a table</CardTitle>
                 <CardDescription>
