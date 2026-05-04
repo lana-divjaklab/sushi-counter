@@ -91,14 +91,31 @@ Small — Inter Medium, 12pt (footnotes, timestamps)
 
 ---
 
-## 5. Mascot (Concept)
+## 5. Mascot: Maki 🍣
 
-The Sushi Counter mascot is a **little sushi roll with a competitive streak.**
+The face of Sushi Counter. A kawaii sushi roll with a competitive streak.
 
-- Name: **Maki** 🍣
-- Expression: Always got a number on its mind
-- Use: Onboarding screens, empty states, celebration animations
-- Colors: White rice body, coral topping, matcha green band
+### Design
+- **Body:** White rice cylinder, coral salmon topping
+- **Face:** Big expressive eyes, small smile (or competitive smirk)
+- **Nori band:** Dark green wrap around the middle (belt vibes)
+- **Accessories:** Crown (when #1), number badge, tiny trophy
+
+### Expressions
+| Emotion | When to use |
+|---|---|
+| 😊 **Happy** | Default, welcome screen, +1 taps |
+| 😤 **Competitive** | On leaderboard, when someone passes you |
+| 😮 **Surprised** | New record, big milestones |
+| 😴 **Sleepy** | Inactive state, "haven't eaten in a while" nag |
+
+### Usage
+- **App icon:** Maki's face with number badge
+- **Onboarding:** Maki introduces the app concept
+- **Empty state:** Maki looking sad — "No sushi yet? Start eating!"
+- **Counter screen:** Maki cheering alongside the big number
+- **Leaderboard:** Maki at top, size varies by rank
+- **Celebrations:** Maki with trophy and confetti
 
 ---
 
@@ -200,14 +217,26 @@ The Sushi Counter mascot is a **little sushi roll with a competitive streak.**
 
 ## 10. Generated Design Assets
 
-### Logo Concepts
+### Logo (Selected)
 
 | File | Description |
 |---|---|
-| `logo_01_mascot.jpg` | Cute sushi roll character with counter number badge |
-| `logo_02_nigiri-circle.jpg` | Nigiri icon inside numbered circle — clean app icon style |
-| `logo_03_typography.jpg` | "SUSHI COUNTER" with sushi roll dotting the "i" |
-| `logo_04_tower.jpg` | Sushi tower with numbers and crown — leaderboard feel |
+| `logo_01_mascot.jpg` | **Selected.** Cute sushi roll character with counter number badge — playful, recognizable, perfect for app icon |
+
+### Mascot Assets
+
+| File | Description |
+|---|---|
+| `mascot_illustration.jpg` | Full kawaii sushi mascot illustration holding a leaderboard sign, brand colors |
+| `mascot_expressions.jpg` | 4-expression set: happy 😊, competitive 😤, surprised 😮, sleepy 😴 — for different app states |
+
+### UI Screens
+
+| File | Description |
+|---|---|
+| `ui_counter_screen.jpg` | Counter screen with big "42" display, +1 button, mascot cheering alongside |
+| `ui_leaderboard.jpg` | Leaderboard rankings with friend list, sushi counts, brand palette |
+| `ui_celebration.jpg` | "New Record!" celebration screen with mascot holding trophy + confetti |
 
 ---
 
@@ -236,19 +265,15 @@ The Sushi Counter mascot is a **little sushi roll with a competitive streak.**
 
 ```
 logo_01_mascot.jpg
-logo_02_nigiri-circle.jpg
-logo_03_typography.jpg
-logo_04_tower.jpg
+mascot_illustration.jpg
+mascot_expressions.jpg
+ui_counter_screen.jpg
+ui_leaderboard.jpg
+ui_celebration.jpg
 icon_favicon.svg
 icon_app-store.png
 badge_10-club.svg
 badge_century.svg
-ui_leaderboard.png
-ui_counter.png
-ui_profile.png
-ui_sushi-night.png
-mockup_leaderboard.png
-mockup_counter.png
 ```
 
 ---
